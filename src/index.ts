@@ -8,6 +8,7 @@ import urlMetadataRouter from './routes/urlMetadata';
 import emailExtractorRouter from './routes/emailExtractor';
 import textCleanRouter from './routes/textClean';
 import domainIntelligenceRouter from './routes/domainIntelligence';
+import companyEnrichmentRouter from './routes/companyEnrichment';
 import docsRouter from './routes/docs';
 import openapiRouter from './routes/openapi';
 
@@ -45,6 +46,7 @@ app.use('/v1', urlMetadataRouter);
 app.use('/v1', emailExtractorRouter);
 app.use('/v1', textCleanRouter);
 app.use('/v1', domainIntelligenceRouter);
+app.use('/v1', companyEnrichmentRouter);
 app.use('/docs', docsRouter);
 app.use('/openapi.json', openapiRouter);
 
