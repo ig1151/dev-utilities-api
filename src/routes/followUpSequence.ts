@@ -1,6 +1,5 @@
 import { Router, Request, Response } from 'express';
 import Joi from 'joi';
-import axios from 'axios';
 import { logger } from '../logger';
 
 const router = Router();
@@ -16,15 +15,20 @@ const schema = Joi.object({
 });
 
 async function callClaude(prompt: string): Promise<unknown> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) throw new Error('ANTHROPIC_API_KEY not set');
-  const res = await axios.post(
-    'https://api.anthropic.com/v1/messages',
-    { model: 'claude-sonnet-4-20250514', max_tokens: 1500, messages: [{ role: 'user', content: prompt }] },
-    { headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' }, timeout: 30000 }
-  );
-  const text = res.data.content[0]?.text ?? '[]';
-  try { return JSON.parse(text.replace(/```json|```/g, '').trim()); } catch { return null; }
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) throw new Error('OPENROUTER_API_KEY not set');
+  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+    body: JSON.stringify({ model: 'anthropic/claude-sonnet-4-5', max_tokens: 1500, messages: [{ role: 'user', content: prompt }], response_format: { type: 'json_object' } }),
+  });
+  if (!response.ok) throw new Error(`OpenRouter error: ${response.status}`);
+  const data = await response.json() as { choices: { message: { content: string } }[] };
+  const text = data.choices[0].message.content ?? '[]';
+  try {
+    const parsed = JSON.parse(text.replace(/```json|```/g, '').trim());
+    return Array.isArray(parsed) ? parsed : (parsed.emails ?? parsed.follow_ups ?? parsed.sequence ?? []);
+  } catch { return null; }
 }
 
 router.post('/follow-up-sequence', async (req: Request, res: Response) => {
@@ -41,16 +45,18 @@ Tone: ${value.tone}
 Days between emails: ${value.days_between}
 ${value.initial_email ? `Initial email sent: ${value.initial_email}` : ''}
 
-Return ONLY a valid JSON array of follow-up emails:
-[
-  {
-    "email_number": 1,
-    "send_day": ${value.days_between},
-    "subject": "subject line",
-    "body": "email body under 80 words",
-    "angle": "the approach angle e.g. value add, social proof, urgency, breakup"
-  }
-]
+Return ONLY a valid JSON object with a "sequence" array of follow-up emails:
+{
+  "sequence": [
+    {
+      "email_number": 1,
+      "send_day": ${value.days_between},
+      "subject": "subject line",
+      "body": "email body under 80 words",
+      "angle": "the approach angle e.g. value add, social proof, urgency, breakup"
+    }
+  ]
+}
 
 Rules:
 - Each email must have a different angle
